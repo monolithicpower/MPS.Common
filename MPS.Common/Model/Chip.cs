@@ -27,9 +27,9 @@ namespace MPS.Common.Model
         [XmlAttribute]
         public string ChipName { get; set; }
 
-        private bool _isAddrAvalible;
+        private bool? _isAddrAvalible;
         [XmlIgnore]
-        public bool IsAddrAvalible
+        public bool? IsAddrAvalible
         {
             get { return _isAddrAvalible; }
             set

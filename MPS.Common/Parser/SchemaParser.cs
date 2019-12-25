@@ -1,17 +1,214 @@
 ﻿using MPS.Common.Model;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Xml.Linq;
 
-namespace MonolithicPowerSystem.AE.Common.Parser
+namespace MPS.Common.Parser
 {
     public class SchemaParser
     {
         public static ProjectConfig XmlToModel(string path)
         {
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = CultureInfo.CreateSpecificCulture("en-US");
+                XNamespace ns = "http://www.monolithicpower.com/XMLSchema";
+                XNamespace xsi = "http://www.w3.org/2001/XMLSchema-instance";
+                var doc = XDocument.Load(path);
+                var checksumDb = doc.Root.Attribute("ChipsChecksum").Value;
+                var chipsElement = doc.Root.Element(ns + "Chips");
+                if (chipsElement == null)
+                    return null;
+                var md5Calc = getMD5String(chipsElement.ToString());
+                if (!string.Equals(md5Calc, checksumDb))
+                {
+                    var dResult = MessageBox.Show("Do you still want to Load?", "The file changed", MessageBoxButton.YesNo);
+                    if (dResult == MessageBoxResult.No)
+                        return null;
+                }
+                ProjectConfig config = new ProjectConfig();
+                config.Product = chipsElement.Attribute("Product") == null ? "" : chipsElement.Attribute("Product").Value;
+                config.BaseProduct = chipsElement.Attribute("BaseProduct") == null ? "" : chipsElement.Attribute("BaseProduct").Value;
+                config.CreatedDate = doc.Root.Attribute("CreatedDate") == null ? "" : doc.Root.Attribute("CreatedDate").Value;
+                config.CreatedTool = doc.Root.Attribute("CreatedTool") == null ? "" : doc.Root.Attribute("CreatedTool").Value;
+                config.CreatedToolVersion = doc.Root.Attribute("CreatedToolVersion") == null ? "" : doc.Root.Attribute("CreatedToolVersion").Value;
+                config.LastModifiedDate = doc.Root.Attribute("LastModifiedDate") == null ? "" : doc.Root.Attribute("LastModifiedDate").Value;
+                config.SpecVersion = doc.Root.Attribute("SpecVersion") == null ? "" : doc.Root.Attribute("SpecVersion").Value;
+                config.Chips = new System.Collections.ObjectModel.ObservableCollection<Chip>();
+
+                List<Chip> chips = new List<Chip>();
+                foreach (var item in doc.Descendants(ns + "Chip"))
+                {
+                    Chip tempChip = new Chip()
+                    {
+                        ChipAddr = item.Attribute("Address").Value,
+                        ChipName = item.Attribute("Name").Value,
+                    };
+
+                    List<Page> pages = new List<Page>();
+
+                    foreach (var reg in item.Descendants(ns + "Register"))
+                    {
+                        List<string> groupNames = new List<string>();
+                        List<string> pageNames = new List<string>();
+                        List<GroupItemInfo> regGroups = new List<MPS.Common.Model.GroupItemInfo>();
+                        #region page
+
+                        foreach (var pg in reg.Descendants(ns + "Page"))
+                        {
+
+                            var tmpPageName = pg.Attribute("Name").Value;
+                            if (!pageNames.Contains(tmpPageName))
+                                pageNames.Add(pg.Attribute("Name").Value);
+                        }
+                        #endregion
+
+                        #region Group
+
+
+
+                        foreach (var gps in reg.Descendants(ns + "DisplayGroup"))
+                        {
+                            var tmpGroupName = gps.Attribute("Name").Value;
+                            if (!groupNames.Contains(tmpGroupName))
+                                groupNames.Add(gps.Attribute("Name").Value);
+
+                        }
+                        #endregion
+
+
+                        //Register tReg = new Register();
+                        //tReg.Address = Convert.ToByte(reg.Attribute("Address").Value, 16);
+                        //tReg.Name = reg.Attribute("Name").Value;
+                        //tReg.DataType = reg.Attribute("DataType").Value;
+                        //tReg.Right = reg.Attribute("Right").Value;
+                        //tReg.BitControls = new List<MPS.Common.Model.BitControl>();
+                        //var tBitControls = new List<MPS.Common.Model.BitControl>();
+                        //foreach (var bt in reg.Descendants(ns + "BitControl"))
+                        //{
+                        //    BitControl btControl = new MPS.Common.Model.BitControl();
+
+                        //    btControl.Unit = bt.Attribute("Unit") == null ? "" : bt.Attribute("Unit").Value;
+                        //    btControl.BitName = bt.Attribute("Name").Value;
+                        //    btControl.Position = Convert.ToByte(bt.Attribute("Position").Value);
+                        //    btControl.BitLength = Convert.ToByte(bt.Attribute("BitLength").Value);
+                        //    var at = bt.Attribute(xsi + "type").Value;
+                        //    if (at == "PossibleValuesType")
+                        //    {
+                        //        List<string> pss = new List<string>();
+                        //        foreach (var ps in bt.Descendants(ns + "PossibleValue"))
+                        //        {
+                        //            pss.Add(string.Format("{0}[{1}]", ps.Attribute("Name").Value, ps.Attribute("Value").Value));
+                        //        }
+                        //        btControl.PossibleValues = string.Join(";", pss);
+                        //    }
+                        //    else
+                        //    {
+                        //        btControl.Lsb = Convert.ToDouble(bt.Attribute("Lsb").Value);
+                        //        btControl.MinValue = Convert.ToDouble(bt.Attribute("MinValue").Value);
+                        //        btControl.MaxValue = Convert.ToDouble(bt.Attribute("MaxValue").Value);
+                        //    }
+                        //    // tReg.BitControls.Add(btControl);
+                        //    tBitControls.Add(btControl);
+                        //}
+
+
+                        foreach (var pageName in pageNames)
+                        {
+                            Register tReg = new Register();
+                            tReg.Address = Convert.ToByte(reg.Attribute("Address").Value, 16);
+                            tReg.Name = reg.Attribute("Name").Value;
+                            tReg.DataType = reg.Attribute("DataType").Value;
+                            tReg.Right = reg.Attribute("Right").Value;
+                            tReg.BitControls = new List<MPS.Common.Model.BitControl>();
+
+                            //var tBitControls = new List<MPS.Common.Model.BitControl>();
+                            foreach (var bt in reg.Descendants(ns + "BitControl"))
+                            {
+                                BitControl btControl = new MPS.Common.Model.BitControl();
+
+                                btControl.Unit = bt.Attribute("Unit") == null ? "" : bt.Attribute("Unit").Value;
+                                btControl.BitName = bt.Attribute("Name").Value;
+                                btControl.Position = Convert.ToByte(bt.Attribute("Position").Value);
+                                btControl.BitLength = Convert.ToByte(bt.Attribute("BitLength").Value);
+                                var at = bt.Attribute(xsi + "type").Value;
+                                if (at == "PossibleValuesType")
+                                {
+                                    List<string> pss = new List<string>();
+                                    foreach (var ps in bt.Descendants(ns + "PossibleValue"))
+                                    {
+                                        pss.Add(string.Format("{0}[{1}]", ps.Attribute("Name").Value, ps.Attribute("Value").Value));
+                                    }
+                                    btControl.PossibleValues = string.Join(";", pss);
+                                }
+                                else
+                                {
+                                    btControl.Lsb = Convert.ToDouble(bt.Attribute("Lsb").Value);
+                                    btControl.MinValue = Convert.ToDouble(bt.Attribute("MinValue").Value);
+                                    btControl.MaxValue = Convert.ToDouble(bt.Attribute("MaxValue").Value);
+                                }
+                                tReg.BitControls.Add(btControl);
+                                //tBitControls.Add(btControl);
+                            }
+
+
+
+                            if (!pages.Any(o => o.PageName == pageName))
+                            {
+                                pages.Add(new MPS.Common.Model.Page() { PageName = pageName, GroupItems = new System.Collections.ObjectModel.ObservableCollection<MPS.Common.Model.GroupItemInfo>() });
+
+                            }
+                            foreach (var groupName in groupNames)
+                            {
+                                if (pages.Where(o => o.PageName == pageName).FirstOrDefault().GroupItems.Any(o => o.GroupItemName == groupName))
+                                {
+                                    //pages.Where(o => o.PageName == pageName).FirstOrDefault().GroupItems.Where(o => o.GroupItemName == groupName).FirstOrDefault().Registers.Add(tReg);
+                                }
+                                else
+                                {
+                                    GroupItemInfo tmp = new MPS.Common.Model.GroupItemInfo()
+                                    {
+                                        GroupItemName = groupName,
+                                        Registers = new System.Collections.ObjectModel.ObservableCollection<MPS.Common.Model.Register>()
+                                    };
+                                    pages.Where(o => o.PageName == pageName).FirstOrDefault().GroupItems.Add(tmp);
+                                }
+                                var cReg = item.Descendants(ns + "Register").Where(o => o.Attribute("Name").Value == tReg.Name && Convert.ToByte(o.Attribute("Address").Value, 16) == tReg.Address).FirstOrDefault();
+                                tReg.Value = Convert.ToInt32(cReg.Descendants(ns + "Page").Where(o => o.Attribute("Name").Value == pageName).FirstOrDefault().Attribute("RegisterValue").Value, 16);
+                                ExplainBitValue(tReg);
+                                pages.Where(o => o.PageName == pageName).FirstOrDefault().GroupItems.Where(o => o.GroupItemName == groupName).FirstOrDefault().Registers.Add(tReg);
+
+                            }
+
+                        }
+
+                    }
+                    tempChip.Pages = new System.Collections.ObjectModel.ObservableCollection<Page>(pages);
+                    config.Chips.Add(tempChip);
+                }
+                //MPS.Common.Serializer.SerializeHelper.XMLSerialize(config, @"E:\New Schema test\8855TEST.xml");
+                //ModelToXml(config, null);
+                return config;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+                return null;
+            }
+
+
+        }
+
+        public static ProjectConfig RebuildXmlToModel(string path)
+        {
+            string CONST_CONFIG_FOLDER = "DataBase";
+
+            System.Threading.Thread.CurrentThread.CurrentCulture = CultureInfo.CreateSpecificCulture("en-US");
             XNamespace ns = "http://www.monolithicpower.com/XMLSchema";
             XNamespace xsi = "http://www.w3.org/2001/XMLSchema-instance";
             var doc = XDocument.Load(path);
@@ -20,15 +217,34 @@ namespace MonolithicPowerSystem.AE.Common.Parser
             if (chipsElement == null)
                 return null;
             var md5Calc = getMD5String(chipsElement.ToString());
-            if (!string.Equals(md5Calc, checksumDb))
-            {
-                var dResult = MessageBox.Show("Do you still want to Load?", "The file changed", MessageBoxButton.YesNo);
-                if (dResult == MessageBoxResult.No)
-                    return null;
-            }
+            //if (!string.Equals(md5Calc, checksumDb))
+            //{
+            //    var dResult = MessageBox.Show("Do you still want to Load?", "The file changed", MessageBoxButton.YesNo);
+            //    if (dResult == MessageBoxResult.No)
+            //        return null;
+            //}
             ProjectConfig config = new ProjectConfig();
+            config.Product = chipsElement.Attribute("Product").Value;
+            config.BaseProduct = chipsElement.Attribute("BaseProduct").Value;
             config.Chips = new System.Collections.ObjectModel.ObservableCollection<Chip>();
+            ProjectConfig defaultConfig = new ProjectConfig();
+            CONST_CONFIG_FOLDER = string.Format(@"{0}\{1}", CONST_CONFIG_FOLDER, config.Product);
+            string defaultPath = System.IO.Path.Combine(CONST_CONFIG_FOLDER, "DefaultDatasheet.Spec");
+            if (!System.IO.File.Exists(defaultPath))
+            {
+                CONST_CONFIG_FOLDER = string.Format(@"{0}\{1}", CONST_CONFIG_FOLDER, config.BaseProduct);
+                defaultPath = System.IO.Path.Combine(CONST_CONFIG_FOLDER, "DefaultDatasheet.Spec");
+                if (System.IO.File.Exists(defaultPath))
+                {
+                    defaultConfig = Common.Parser.SchemaParser.XmlToModel(defaultPath);
 
+                }
+
+            }
+            else
+            {
+                defaultConfig = Common.Parser.SchemaParser.XmlToModel(defaultPath);
+            }
             List<Chip> chips = new List<Chip>();
             foreach (var item in doc.Descendants(ns + "Chip"))
             {
@@ -58,52 +274,25 @@ namespace MonolithicPowerSystem.AE.Common.Parser
 
                     #region Group
 
-
-
-                    foreach (var gps in reg.Descendants(ns + "DisplayGroup"))
+                    foreach (var page in defaultConfig.Chips.FirstOrDefault().Pages)
                     {
-                        var tmpGroupName = gps.Attribute("Name").Value;
-                        if (!groupNames.Contains(tmpGroupName))
-                            groupNames.Add(gps.Attribute("Name").Value);
-
+                        foreach (var gp in page.GroupItems)
+                        {
+                            if (gp.Registers.Any(o => o.Name == reg.Attribute("Name").Value))
+                            {
+                                groupNames.Add(gp.GroupItemName);
+                            }
+                        }
                     }
-                    #endregion
 
-
-                    //Register tReg = new Register();
-                    //tReg.Address = Convert.ToByte(reg.Attribute("Address").Value, 16);
-                    //tReg.Name = reg.Attribute("Name").Value;
-                    //tReg.DataType = reg.Attribute("DataType").Value;
-                    //tReg.Right = reg.Attribute("Right").Value;
-                    //tReg.BitControls = new List<MPS.Common.Model.BitControl>();
-                    //var tBitControls = new List<MPS.Common.Model.BitControl>();
-                    //foreach (var bt in reg.Descendants(ns + "BitControl"))
+                    //foreach (var gps in reg.Descendants(ns + "DisplayGroup"))
                     //{
-                    //    BitControl btControl = new MPS.Common.Model.BitControl();
+                    //    var tmpGroupName = gps.Attribute("Name").Value;
+                    //    if (!groupNames.Contains(tmpGroupName))
+                    //        groupNames.Add(gps.Attribute("Name").Value);
 
-                    //    btControl.Unit = bt.Attribute("Unit") == null ? "" : bt.Attribute("Unit").Value;
-                    //    btControl.BitName = bt.Attribute("Name").Value;
-                    //    btControl.Position = Convert.ToByte(bt.Attribute("Position").Value);
-                    //    btControl.BitLength = Convert.ToByte(bt.Attribute("BitLength").Value);
-                    //    var at = bt.Attribute(xsi + "type").Value;
-                    //    if (at == "PossibleValuesType")
-                    //    {
-                    //        List<string> pss = new List<string>();
-                    //        foreach (var ps in bt.Descendants(ns + "PossibleValue"))
-                    //        {
-                    //            pss.Add(string.Format("{0}[{1}]", ps.Attribute("Name").Value, ps.Attribute("Value").Value));
-                    //        }
-                    //        btControl.PossibleValues = string.Join(";", pss);
-                    //    }
-                    //    else
-                    //    {
-                    //        btControl.Lsb = Convert.ToDouble(bt.Attribute("Lsb").Value);
-                    //        btControl.MinValue = Convert.ToDouble(bt.Attribute("MinValue").Value);
-                    //        btControl.MaxValue = Convert.ToDouble(bt.Attribute("MaxValue").Value);
-                    //    }
-                    //    // tReg.BitControls.Add(btControl);
-                    //    tBitControls.Add(btControl);
                     //}
+                    #endregion
 
 
                     foreach (var pageName in pageNames)
@@ -166,8 +355,8 @@ namespace MonolithicPowerSystem.AE.Common.Parser
                                 };
                                 pages.Where(o => o.PageName == pageName).FirstOrDefault().GroupItems.Add(tmp);
                             }
-                            var cReg = doc.Descendants(ns + "Register").Where(o => o.Attribute("Name").Value == tReg.Name).FirstOrDefault();
-                            tReg.Value = Convert.ToInt32(cReg.Descendants(ns + "Page").Where(o => o.Attribute("Name").Value == pageName).FirstOrDefault().Attribute("RegisterValue").Value, 16);
+                            var cReg = item.Descendants(ns + "Register").Where(o => o.Attribute("Name").Value == tReg.Name && Convert.ToByte(o.Attribute("Address").Value, 16) == tReg.Address).FirstOrDefault();
+                            tReg.Value = Convert.ToInt32(cReg.Descendants(ns + "Page").Where(o => o.Attribute("Name").Value == tReg.Name).FirstOrDefault().Attribute("RegisterValue").Value, 16);
                             ExplainBitValue(tReg);
                             pages.Where(o => o.PageName == pageName).FirstOrDefault().GroupItems.Where(o => o.GroupItemName == groupName).FirstOrDefault().Registers.Add(tReg);
 
@@ -179,6 +368,7 @@ namespace MonolithicPowerSystem.AE.Common.Parser
                 tempChip.Pages = new System.Collections.ObjectModel.ObservableCollection<Page>(pages);
                 config.Chips.Add(tempChip);
             }
+
             //MPS.Common.Serializer.SerializeHelper.XMLSerialize(config, @"E:\New Schema test\8855TEST.xml");
             //ModelToXml(config, null);
             return config;
@@ -187,23 +377,25 @@ namespace MonolithicPowerSystem.AE.Common.Parser
 
         public static void ModelToXml(ProjectConfig config, string path)
         {
+            System.Threading.Thread.CurrentThread.CurrentCulture = CultureInfo.CreateSpecificCulture("en-US");
             XNamespace ns = "http://www.monolithicpower.com/XMLSchema";
             XNamespace xsi = "http://www.w3.org/2001/XMLSchema-instance";
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
             XDocument xDoc = new XDocument();
             XElement root = new XElement(ns + "ProjectConfig", new XAttribute(XNamespace.Xmlns + "xsi", xsi),
-                new XAttribute("LastModifiedTool", System.Diagnostics.Process.GetCurrentProcess().ProcessName.Split(new char[] { '.' })[0]),
-                 new XAttribute("CreatedTool", System.Diagnostics.Process.GetCurrentProcess().ProcessName.Split(new char[] { '.' })[0]),
-                new XAttribute("CreatedDate", DateTime.Now),
-                new XAttribute("LastModifiedDate", DateTime.Now),
-                new XAttribute("CreatedToolVersion", version),
-                new XAttribute("LastModifiedToolVersion", version),
 
+                 new XAttribute("CreatedTool", config.CreatedTool),
+                  new XAttribute("CreatedToolVersion", config.CreatedToolVersion),
+                new XAttribute("CreatedDate", config.CreatedDate),
+                 new XAttribute("LastModifiedTool", config.LastModifiedTool),
+                new XAttribute("LastModifiedToolVersion", config.LastModifiedToolVersion),
+                 new XAttribute("LastModifiedDate", DateTime.Now),
+                   new XAttribute("SpecVersion", config.SpecVersion),
                 new XAttribute("ChipsChecksum", ""));
             // XElement root = new XElement("ProjectConfig");
 
             xDoc.Add(root);
-            XElement tChips = new XElement(ns + "Chips");
+            XElement tChips = new XElement(ns + "Chips", new XAttribute("Product", config.Product), new XAttribute("BaseProduct", config.BaseProduct));
             root.Add(tChips);
             //xDoc.Save(@"E:\TOXML.xml");
 
@@ -221,7 +413,7 @@ namespace MonolithicPowerSystem.AE.Common.Parser
                         {
                             ParseRegisterValue(reg);
 
-                            XElement bReg = tRegs.Elements(ns + "Register").Where(o => o.Attribute("Name").Value == reg.Name).FirstOrDefault();
+                            XElement bReg = tRegs.Elements(ns + "Register").Where(o => o.Attribute("Name").Value == reg.Name && Convert.ToByte(o.Attribute("Address").Value, 16) == reg.Address).FirstOrDefault();
                             if (bReg != null)
                             {
                                 // var xe = bReg.Descendants(ns+ "DisplayGroup").Where(o => o.Attribute("Name").Value == group.GroupItemName);
@@ -239,14 +431,14 @@ namespace MonolithicPowerSystem.AE.Common.Parser
                                 }
 
                                 XElement morePage = new XElement(ns + "Page", new XAttribute("Name", page.PageName),
-                               new XAttribute("RegisterValue", string.Format("0x{0}", Convert.ToString(reg.Value, 16))));
+                               new XAttribute("RegisterValue", $"0x{(reg.DataType == EnumCommandType.Word.ToString() ? reg.Value.ToString("X4") : reg.Value.ToString("X2"))}"));
                                 XElement morePages = bReg.Element(ns + "Pages");
                                 morePages.Add(morePage);
                                 continue;
                             }
 
                             //cp.ChipAddr = $"0x{addAddr / 16:x}{addAddr % 16:x}";
-                            XElement tReg = new XElement(ns + "Register", new XAttribute("Name", reg.Name), new XAttribute("Address", $"0x{reg.Address / 16:x}{reg.Address % 16:x}"),
+                            XElement tReg = new XElement(ns + "Register", new XAttribute("Name", reg.Name), new XAttribute("Address", $"0x{reg.Address.ToString("X2") }"),
                             new XAttribute("DataType", reg.DataType), new XAttribute("Right", reg.Right));
                             tRegs.Add(tReg);
                             XElement tBits = new XElement(ns + "BitControls");
@@ -258,9 +450,9 @@ namespace MonolithicPowerSystem.AE.Common.Parser
                                 {
                                     tBit = new XElement(ns + "BitControl", new XAttribute(xsi + "type", "MinMaxType"),
                                         new XAttribute("Name", bit.BitName), new XAttribute("Position", bit.Position),
-                                        new XAttribute("BitLength", bit.BitLength), new XAttribute("Lsb", bit.Lsb),
-                                        new XAttribute("MinValue", bit.MinValue), new XAttribute("MaxValue", bit.MaxValue),
-                                        new XAttribute("Unit", bit.Unit ?? ""));
+                                        new XAttribute("BitLength", bit.BitLength), new XAttribute("Unit", bit.Unit ?? ""), new XAttribute("Lsb", bit.Lsb),
+                                        new XAttribute("MinValue", bit.MinValue), new XAttribute("MaxValue", bit.MaxValue)
+                                        );
 
                                 }
                                 else
@@ -292,7 +484,7 @@ namespace MonolithicPowerSystem.AE.Common.Parser
                             tReg.Add(tPages);
 
                             XElement tPage = new XElement(ns + "Page", new XAttribute("Name", page.PageName),
-                                new XAttribute("RegisterValue", string.Format("0x{0}", Convert.ToString(reg.Value, 16))));
+                                new XAttribute("RegisterValue", $"0x{(reg.DataType == EnumCommandType.Word.ToString() ? reg.Value.ToString("X4") : reg.Value.ToString("X2"))}"));
                             tPages.Add(tPage);
 
                             XElement tDisplayGroups = new XElement(ns + "DisplayGroups");
@@ -445,14 +637,30 @@ namespace MonolithicPowerSystem.AE.Common.Parser
 
         private static string getMD5String(string original)
         {
+            string pattern = ">[\\s]+<";
+            string replacement = "><";
+            Regex rgx = new Regex(pattern);
+            string result = rgx.Replace(original, replacement);
+            //Console.Write("result : " + result);
             string hash;
             using (System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create())
             {
+                Byte[] bytes = Encoding.UTF8.GetBytes(result);
                 hash = BitConverter.ToString(
-                  md5.ComputeHash(Encoding.UTF8.GetBytes(original))
+                  md5.ComputeHash(bytes)
                 ).Replace("-", String.Empty);
             }
             return hash;
+
+
+            //string hash;
+            //using (System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create())
+            //{
+            //    hash = BitConverter.ToString(
+            //      md5.ComputeHash(Encoding.UTF8.GetBytes(original))
+            //    ).Replace("-", String.Empty);
+            //}
+            //return hash;
         }
 
     }

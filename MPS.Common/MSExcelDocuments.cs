@@ -482,9 +482,6 @@ namespace MPS.Common
             return row;
         }
 
-
-
-
         public static void ExportToExcel(string filePath, DataSet ds)
         {
             var dirPath = filePath.Remove(filePath.LastIndexOf('\\') + 1);
@@ -646,8 +643,6 @@ namespace MPS.Common
                 return ds;
             }
         }
-
-
 
         public static void ExportToExcel(string filePath, DataTable dt)
         {

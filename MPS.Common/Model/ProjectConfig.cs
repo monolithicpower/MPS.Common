@@ -12,5 +12,23 @@ namespace MPS.Common.Model
     {
         [XmlArrayItem]
         public ObservableCollection<Chip> Chips { get; set; }
+
+        public string Product { get; set; }
+
+        public string BaseProduct { get; set; }
+
+        public string CreatedTool { get; set; }
+
+        public string CreatedDate { get; set; }
+
+        public string LastModifiedTool { get; set; }
+        public string CreatedToolVersion { get; set; }
+
+        public string LastModifiedToolVersion { get; set; }
+
+        public string LastModifiedDate { get; set; }
+
+        public string SpecVersion { get; set; }
+
     }
 }

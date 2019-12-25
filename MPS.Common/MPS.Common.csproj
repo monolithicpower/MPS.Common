@@ -8,7 +8,7 @@
     <ProjectGuid>{E3EBB8D6-5207-44B7-BFD3-C994E40134FD}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>MonolithicPowerSystem.AE.Common</RootNamespace>
+    <RootNamespace>MPS.Common</RootNamespace>
     <AssemblyName>MPS.Common</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -57,6 +57,7 @@
     <Compile Include="Chart\ChartPlotter.cs" />
     <Compile Include="Chart\LineGraphViewModel.cs" />
     <Compile Include="Chart\ViewModelBase.cs" />
+    <Compile Include="Command\RelayCommand.cs" />
     <Compile Include="EnumPartnumber.cs" />
     <Compile Include="Log\LogHelper.cs" />
     <Compile Include="Model\BitControl.cs" />

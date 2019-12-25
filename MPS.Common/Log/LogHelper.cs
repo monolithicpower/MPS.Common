@@ -52,6 +52,28 @@ namespace MPS.Common.Log
 
             }
         }
+        static public void WriteLog(LogMode logmode,string path, string content)
+        {
+            try
+            {
+                lock (_mutex)
+                {
+                    XmlDocument doc = LoadLogFile(path);
+                    XmlNode logentryNode = CreateLogEntryNode(doc);
+                    logentryNode.SelectSingleNode("Host").InnerText = string.Join(",", System.Net.Dns.GetHostName());
+                    logentryNode.SelectSingleNode("mode").InnerText = logmode.ToString();
+                    logentryNode.SelectSingleNode("content").InnerText = content;
+                    logentryNode.SelectSingleNode("date").InnerText = DateTime.Now.ToString();
+                    string filename = string.Format("{0}-{1}-{2}_log.xml", DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day);
+                    var filepath = Path.Combine(path, filename);
+                    doc.Save(filepath);
+                }
+            }
+            catch
+            {
+
+            }
+        }
         static private XmlNode CreateLogEntryNode(XmlDocument doc)
         {
             XmlNode logentryNode = doc.CreateElement("entry");
@@ -88,6 +110,26 @@ namespace MPS.Common.Log
             return doc;
         }
 
+        static private XmlDocument LoadLogFile(string logpath)
+        {
+            XmlDocument doc = new XmlDocument();
+            if (!System.IO.Directory.Exists(logpath))
+            {
+                System.IO.Directory.CreateDirectory(logpath);
+            }
+            string filename = string.Format("{0}-{1}-{2}_log.xml", DateTime.Today.Year, DateTime.Today.Month, DateTime.Today.Day);
+           var filepath= Path.Combine(logpath, filename);
+            if (System.IO.File.Exists(filepath))
+            {
+                doc.Load(LogFile);
+            }
+            if (doc.FirstChild == null)
+            {
+                XmlNode rootNode = doc.CreateElement("log");
+                doc.AppendChild(rootNode);
+            }
+            return doc;
+        }
         public static Exception GetRawException(System.Exception e)
         {
             if (e.InnerException == null)
